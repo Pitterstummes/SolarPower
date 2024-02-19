@@ -20,29 +20,29 @@ def calculate_sun_position(latitude, longitude, date):
     return azimuth, elevation
 
 
-def calculate_delta_angle(azimut_sun, azimut_panel, elevation_sun, elevation_panel):
+def calculate_delta_angle(sun_azimut, panel_orientation, sun_elevation, panel_tilt):
     # Calculate the angle between the sun and the solar panel
-    # Handle degree or radian input
-    azimut_sun = np.deg2rad(azimut_sun)
-    azimut_panel = np.deg2rad(azimut_panel)
-    elevation_sun = np.deg2rad(elevation_sun)
-    elevation_panel = np.deg2rad(elevation_panel)
+    # Convert to radians
+    sun_azimut = np.deg2rad(sun_azimut)
+    panel_orientation = np.deg2rad(panel_orientation)
+    sun_elevation = np.deg2rad(sun_elevation)
+    panel_tilt = np.deg2rad(panel_tilt)
     # Convert to spherical coordinates, r = 1
-    theta_sun = np.pi / 2 - elevation_sun
-    theta_panel = np.pi / 2 - elevation_panel
-    phi_sun = azimut_sun
-    phi_panel = azimut_panel
+    theta_sun = np.pi / 2 - sun_elevation
+    theta_panel = np.pi / 2 - panel_tilt
+    phi_sun = sun_azimut
+    phi_panel = panel_orientation
     # Calculate dot product of the two vectors
     dot_product = np.sin(theta_sun) * np.sin(theta_panel) * np.cos(
         phi_sun - phi_panel
     ) + np.cos(theta_sun) * np.cos(theta_panel)
-    # Calculate angle
+    # Calculate angle in degrees
     angle = np.rad2deg(np.arccos(dot_product))
     return angle
 
 
 def create_timestamps(date, time_step):
-    # Create a list of timestamps for each time step of the day
+    # Create an array of timestamps for one day
     start_time = datetime.datetime(date.year, date.month, date.day)
     end_time = start_time + datetime.timedelta(days=1)
     num_steps = int((end_time - start_time) / time_step)
@@ -143,8 +143,21 @@ def calc_power_ratio(angles):
     return power_ratio
 
 
+def calc_irradiance(elevations):
+    # Calculate the irradiance for each elevation
+    irradiance = np.zeros(len(elevations))
+    for i in range(len(elevations)):
+        irradiance[i] = np.sin(np.deg2rad(elevations[i]))
+    return irradiance
+
+
 def plot_panel_angle(
-    azimuths, angles, elevations, timestamps, panel_azimuth, panel_elevation
+    azimuths,
+    angles,
+    elevations,
+    timestamps,
+    panel_azimuth,
+    panel_elevation,
 ):
     # Plot the angle between the sun and the solar panel
     fig, ax = plt.subplots()
@@ -161,8 +174,10 @@ def plot_panel_angle(
             label="Panel " + str(i + 1),
         )
     power_ratio = calc_power_ratio(angles)
-    power_ratio = power_ratio * 80
-    ax.scatter(azimuths, power_ratio, label="Power Ratio")
+    irradiance = calc_irradiance(elevations)
+    irrad_power_ratio = power_ratio * irradiance
+    irrad_power_ratio_norm = irrad_power_ratio / np.max(irrad_power_ratio) * 90
+    ax.scatter(azimuths, irrad_power_ratio_norm, label="Power Ratio")
     ax.set_xlabel("Azimuth in degrees")
     ax.set_ylabel("Angle in degrees")
     titletext = "Angle between Sun and Solar Panel"
@@ -175,7 +190,7 @@ def plot_panel_angle(
 # Coordinates & date
 latitude = 48.8
 longitude = 9
-date = datetime.datetime.now() + datetime.timedelta(days=130)  # Add days
+date = datetime.datetime.now() + datetime.timedelta(days=0)  # Add days
 time_step = datetime.timedelta(minutes=1)
 azimuths_sun, elevations_sun, timestamps = get_sun_position(
     latitude, longitude, date, time_step, True
